@@ -1,8 +1,8 @@
 package com.example.supabaseauth.service;
 
 import com.example.supabaseauth.dto.LoginRequest;
-import com.example.supabaseauth.dto.SignupRequest;
 import com.example.supabaseauth.dto.ProfileResponse;
+import com.example.supabaseauth.dto.SignupRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,7 +11,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -84,18 +83,35 @@ public class SupabaseAuthService {
             String id = root.path("id").asText(null);
             String email = root.path("email").asText(null);
             String role = root.path("role").asText(null);
-            boolean emailVerified = false;
-            if (root.has("user_metadata") && root.path("user_metadata").has("email_verified")) {
-                emailVerified = root.path("user_metadata").path("email_verified").asBoolean(false);
-            }
+            boolean emailVerified = root.path("user_metadata").path("email_verified").asBoolean(false);
             String createdAt = root.path("created_at").asText(null);
 
             return new ProfileResponse(id, email, role, emailVerified, createdAt);
         } catch (WebClientResponseException ex) {
-            // If Supabase returns an error, throw an exception with body for controller to handle
             throw new RuntimeException("Supabase error: " + ex.getResponseBodyAsString());
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse profile response", e);
         }
     }
+
+    public boolean validateToken(String bearerToken) {
+        try {
+            String resp = webClient.get()
+                    .uri("/user")
+                    .header("apikey", anonKey)
+                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+            JsonNode root = mapper.readTree(resp);
+            return root.hasNonNull("id");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+
+
+
+
 }
